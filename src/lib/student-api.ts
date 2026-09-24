@@ -143,7 +143,9 @@ export interface LearningSummary {
   assignments_submitted: number;
 }
 
-export const loadLearningSummary = () => apiRequest('/student/learning-summary') as Promise<LearningSummary>;
+// Dashboard, achievements, and course progress share this one server-computed
+// learning record. Never mix it with the older demo summary endpoint.
+export const loadLearningSummary = () => apiRequest('/student/dashboard') as Promise<LearningSummary>;
 
 export const saveQuizAttempt = (quizId: string, score: number, totalQuestions: number, correctAnswers: number) =>
   apiRequest('/student/quiz-attempts', { method: 'POST', body: JSON.stringify({ quiz_id: quizId, score, total_questions: totalQuestions, correct_answers: correctAnswers }) });
