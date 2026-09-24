@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import {
   Trophy, Clock, Flame, Zap, ArrowRight, Sparkles, BookOpen,
-  CheckCircle2, PlayCircle, Award, Target, MessageSquare, Upload,
+  CheckCircle2, PlayCircle, Award, Target, Upload,
   type LucideIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
