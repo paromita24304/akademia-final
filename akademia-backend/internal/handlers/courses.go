@@ -720,6 +720,18 @@ func GetCourseDetail(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Course id is required"})
 		return
 	}
+	// Student routes use the friendly slug, while instructor/admin APIs often
+	// use the database id. Resolve either to the one shared course record.
+	var resolvedCourseID string
+	if err := config.DB.QueryRow(`SELECT id FROM platform_courses WHERE id = $1 OR slug = $1 LIMIT 1`, courseID).Scan(&resolvedCourseID); err != nil {
+		if err == sql.ErrNoRows {
+			writeJSON(w, http.StatusNotFound, map[string]string{"message": "Course not found"})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Could not resolve course"})
+		return
+	}
+	courseID = resolvedCourseID
 	var course struct {
 		ID          string
 		Title       string
