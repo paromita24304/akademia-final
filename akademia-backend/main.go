@@ -79,6 +79,7 @@ func main() {
 	http.HandleFunc("/api/student/ai/messages", enableCORS(handlers.AIChatMessages))
 	http.HandleFunc("/api/student/ai/message", enableCORS(handlers.CreateAIChatMessage))
 	http.HandleFunc("/api/student/ai/generate", enableCORS(handlers.GeminiCoachResponse))
+	http.HandleFunc("/api/student/ai/generate-live", enableCORS(handlers.GeminiTextCoach))
 	http.HandleFunc("/api/student/course-messages", enableCORS(handlers.StudentCourseMessages))
 	http.HandleFunc("/api/student/course-message", enableCORS(handlers.CreateStudentCourseMessage))
 	http.HandleFunc("/api/instructor/course-messages", enableCORS(handlers.InstructorCourseMessages))
