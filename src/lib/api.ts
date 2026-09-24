@@ -38,7 +38,13 @@ export async function apiRequest(endpoint: string, options: RequestOptions = {})
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(errorText || 'Something went wrong');
+    try {
+      const payload = JSON.parse(errorText) as { message?: string };
+      throw new Error(payload.message || 'Something went wrong');
+    } catch (error) {
+      if (error instanceof Error && error.message !== errorText) throw error;
+      throw new Error(errorText || 'Something went wrong');
+    }
   }
 
   return response.json();
