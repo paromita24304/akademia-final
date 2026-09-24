@@ -56,15 +56,17 @@ export function MyCoursesPage() {
         const enrolledCourses = Array.isArray(data.enrollments) ? data.enrollments : [];
         setStudentCourses(enrolledCourses.map((item: {
           course_id: string;
+          slug?: string;
           title: string;
           description?: string;
           thumbnail_url?: string;
           category?: string;
           difficulty?: Course['difficulty'];
+          instructor_name?: string;
           status: 'saved' | 'in-progress' | 'completed';
         }) => ({
           id: item.course_id,
-          slug: item.course_id,
+          slug: item.slug || item.course_id,
           title: item.title,
           subtitle: item.description || 'Enrolled course',
           description: item.description || '',
@@ -75,7 +77,7 @@ export function MyCoursesPage() {
           reviews: 0,
           enrolled: 1,
           durationHours: 1,
-          instructor: { id: '', name: 'Akademia Instructor', title: 'Instructor', avatarUrl: '', rating: 0, students: 0 },
+          instructor: { id: '', name: item.instructor_name || 'Akademia Instructor', title: 'Instructor', avatarUrl: '', rating: 0, students: 0 },
           tags: [],
           modules: [],
           status: item.status === 'completed' ? 'completed' : item.status === 'in-progress' ? 'in-progress' : 'not-started',
@@ -87,7 +89,7 @@ export function MyCoursesPage() {
     };
     void loadEnrolledCourses();
     return () => { cancelled = true; };
-  }, []);
+  }, [state]);
   const ongoing = studentCourses.filter((course) => course.status === 'in-progress');
   const completed = studentCourses.filter((course) => course.status === 'completed');
   const pending = studentCourses.filter((course) => course.status === 'not-started');
