@@ -71,7 +71,7 @@ export function useChat() {
       }
       const savedUser = await apiRequest('/student/ai/message', { method: 'POST', body: JSON.stringify({ conversation_id: Number(conversationId), role: 'user', content: text.trim() }) }) as { id: number; role: 'user'; content: string; created_at: string };
       setMessages((current) => [...current, toMessage(savedUser)]);
-      const generated = await apiRequest('/student/ai/generate', { method: 'POST', body: JSON.stringify({ prompt: text.trim() }) }) as { content: string };
+      const generated = await apiRequest('/student/ai/generate-live', { method: 'POST', body: JSON.stringify({ prompt: text.trim() }) }) as { content: string };
       const response = generated.content;
       streamResponse(response, async () => {
         try {
