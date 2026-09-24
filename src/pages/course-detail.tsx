@@ -81,8 +81,9 @@ export function CourseDetailPage() {
 
     const resolveCourse = async () => {
       try {
-        if (id) {
-          const data = await apiRequest(`/courses/${encodeURIComponent(id)}`);
+        const courseReference = id || slug;
+        if (courseReference) {
+          const data = await apiRequest(`/courses/${encodeURIComponent(courseReference)}`);
           // Fetch the student's existing submissions in parallel so assignment
           // lessons can show their "already submitted" state right away.
           let submittedLessonIds = new Set<string>();
