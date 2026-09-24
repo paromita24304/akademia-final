@@ -30,7 +30,11 @@ export function useChat() {
     try {
       const data = await apiRequest('/student/ai/conversations') as { conversations?: Array<{ id: number; title: string; created_at: string; updated_at: string }> };
       setConversations((data.conversations ?? []).map(toConversation));
-    } catch (error) { setError('AI Coach could not reach the backend. Start the Go server and sign in again.'); console.error('Failed to load AI conversations:', error); }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'AI Coach could not load conversations.';
+      setError(message);
+      console.error('Failed to load AI conversations:', error);
+    }
     finally { setLoadingConversations(false); }
   }, [user]);
 
