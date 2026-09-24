@@ -92,6 +92,7 @@ func main() {
 	http.HandleFunc("/api/student/discussions/replies", enableCORS(handlers.StudentDiscussionReplyRouter))
 	http.HandleFunc("/api/student/discussions", enableCORS(handlers.StudentDiscussionRouter))
 	http.HandleFunc("/api/student/learning-summary", enableCORS(handlers.StudentLearningSummary))
+	http.HandleFunc("/api/student/dashboard", enableCORS(handlers.StudentDashboardSync))
 	http.HandleFunc("/api/student/quiz-attempts", enableCORS(handlers.SaveQuizAttempt))
 	http.HandleFunc("/api/instructor/lessons/", enableCORS(handlers.CreateQuizQuestion))
 	http.HandleFunc("/api/instructor/quiz/generate", enableCORS(handlers.GenerateAIQuiz))
