@@ -134,11 +134,12 @@ func EnrollStudent(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == http.MethodGet {
 		rows, err := config.DB.Query(`
-			SELECT c.id, c.title, COALESCE(c.description, ''), COALESCE(c.thumbnail_path, ''),
+			SELECT c.id, c.slug, c.title, COALESCE(c.description, ''), COALESCE(c.thumbnail_path, ''),
 			       COALESCE(c.category, 'General'), COALESCE(c.difficulty, 'Beginner'),
-			       se.status, se.enrolled_at, se.completed_at
+			       COALESCE(u.name, 'Akademia Instructor'), se.status, se.enrolled_at, se.completed_at
 			FROM student_enrollments se
 			JOIN platform_courses c ON se.course_id = c.id
+			JOIN users u ON u.id = c.instructor_id
 			WHERE se.user_id = $1
 			ORDER BY se.enrolled_at DESC`, student.UserID)
 		if err != nil {
@@ -149,20 +150,22 @@ func EnrollStudent(w http.ResponseWriter, r *http.Request) {
 
 		enrollments := make([]map[string]any, 0)
 		for rows.Next() {
-			var id, title, description, thumbnail, category, difficulty, status string
+			var id, slug, title, description, thumbnail, category, difficulty, instructorName, status string
 			var enrolledAt time.Time
 			var completedAt *time.Time
-			if err := rows.Scan(&id, &title, &description, &thumbnail, &category, &difficulty, &status, &enrolledAt, &completedAt); err != nil {
+			if err := rows.Scan(&id, &slug, &title, &description, &thumbnail, &category, &difficulty, &instructorName, &status, &enrolledAt, &completedAt); err != nil {
 				writeStudentError(w, http.StatusInternalServerError, "Could not read enrolled courses")
 				return
 			}
 			enrollments = append(enrollments, map[string]any{
 				"course_id": id,
+				"slug": slug,
 				"title": title,
 				"description": description,
 				"thumbnail_url": thumbnail,
 				"category": category,
 				"difficulty": difficulty,
+				"instructor_name": instructorName,
 				"status": status,
 				"enrolled_at": enrolledAt,
 				"completed_at": completedAt,
@@ -247,12 +250,37 @@ func SaveLessonProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The backend owns completion status. Do not trust a browser-provided
+	// course_complete flag: it can be stale if an instructor changes curriculum.
+	courseID := strings.TrimSpace(input.CourseID)
+	var totalLessons, completedLessons int
+	if err = tx.QueryRow(`
+		SELECT COUNT(*)
+		FROM platform_lessons l
+		JOIN platform_modules m ON m.id = l.module_id
+		WHERE m.course_id = $1`, courseID).Scan(&totalLessons); err != nil {
+		writeStudentError(w, http.StatusInternalServerError, "Could not calculate course progress")
+		return
+	}
+	if err = tx.QueryRow(`
+		SELECT COUNT(*)
+		FROM student_lesson_progress
+		WHERE user_id = $1 AND course_id = $2 AND completed = TRUE`,
+		student.UserID, courseID).Scan(&completedLessons); err != nil {
+		writeStudentError(w, http.StatusInternalServerError, "Could not calculate course progress")
+		return
+	}
+
 	status := "in-progress"
-	if input.CourseComplete && input.Completed {
+	if totalLessons > 0 && completedLessons >= totalLessons {
 		status = "completed"
-		_, err = tx.Exec(`UPDATE student_enrollments SET status = 'completed', completed_at = NOW(), updated_at = NOW() WHERE user_id = $1 AND course_id = $2`, student.UserID, strings.TrimSpace(input.CourseID))
-	} else if !input.Completed {
-		_, err = tx.Exec(`UPDATE student_enrollments SET status = 'in-progress', completed_at = NULL, updated_at = NOW() WHERE user_id = $1 AND course_id = $2`, student.UserID, strings.TrimSpace(input.CourseID))
+		_, err = tx.Exec(`UPDATE student_enrollments
+			SET status = 'completed', completed_at = COALESCE(completed_at, NOW()), updated_at = NOW()
+			WHERE user_id = $1 AND course_id = $2`, student.UserID, courseID)
+	} else {
+		_, err = tx.Exec(`UPDATE student_enrollments
+			SET status = 'in-progress', completed_at = NULL, updated_at = NOW()
+			WHERE user_id = $1 AND course_id = $2`, student.UserID, courseID)
 	}
 	if err != nil {
 		writeStudentError(w, http.StatusInternalServerError, "Could not update course status")
@@ -263,7 +291,10 @@ func SaveLessonProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"course_id": input.CourseID, "lesson_id": input.LessonID, "completed": input.Completed, "course_status": status})
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"course_id": courseID, "lesson_id": input.LessonID, "completed": input.Completed,
+		"course_status": status, "completed_lessons": completedLessons, "total_lessons": totalLessons,
+	})
 }
 
 // CreateCourseFeedback stores feedback submitted by a student. Instructor/admin
