@@ -143,6 +143,8 @@ export function InstructorCoursesPage() {
             status?: string;
             thumbnail_url?: string;
             student_count?: number;
+            avg_rating?: number;
+            review_count?: number;
           }) => ({
             id: course.id,
             title: course.title,
