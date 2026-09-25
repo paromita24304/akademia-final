@@ -136,7 +136,24 @@ func EnrollStudent(w http.ResponseWriter, r *http.Request) {
 		rows, err := config.DB.Query(`
 			SELECT c.id, c.slug, c.title, COALESCE(c.description, ''), COALESCE(c.thumbnail_path, ''),
 			       COALESCE(c.category, 'General'), COALESCE(c.difficulty, 'Beginner'),
-			       COALESCE(u.name, 'Akademia Instructor'), se.status, se.enrolled_at, se.completed_at
+			       COALESCE(u.name, 'Akademia Instructor'), se.status, se.enrolled_at, se.completed_at,
+			       COALESCE(
+			         (SELECT l.id
+			          FROM platform_lessons l
+			          JOIN platform_modules m ON m.id = l.module_id
+			          LEFT JOIN student_lesson_progress lp
+			            ON lp.lesson_id = l.id AND lp.user_id = se.user_id AND lp.completed = TRUE
+			          WHERE m.course_id = c.id AND lp.lesson_id IS NULL
+			          ORDER BY m.position, l.position
+			          LIMIT 1),
+			         (SELECT l.id
+			          FROM platform_lessons l
+			          JOIN platform_modules m ON m.id = l.module_id
+			          WHERE m.course_id = c.id
+			          ORDER BY m.position, l.position
+			          LIMIT 1),
+			         ''
+			       ) AS resume_lesson_id
 			FROM student_enrollments se
 			JOIN platform_courses c ON se.course_id = c.id
 			JOIN users u ON u.id = c.instructor_id
@@ -150,10 +167,10 @@ func EnrollStudent(w http.ResponseWriter, r *http.Request) {
 
 		enrollments := make([]map[string]any, 0)
 		for rows.Next() {
-			var id, slug, title, description, thumbnail, category, difficulty, instructorName, status string
+			var id, slug, title, description, thumbnail, category, difficulty, instructorName, status, resumeLessonID string
 			var enrolledAt time.Time
 			var completedAt *time.Time
-			if err := rows.Scan(&id, &slug, &title, &description, &thumbnail, &category, &difficulty, &instructorName, &status, &enrolledAt, &completedAt); err != nil {
+			if err := rows.Scan(&id, &slug, &title, &description, &thumbnail, &category, &difficulty, &instructorName, &status, &enrolledAt, &completedAt, &resumeLessonID); err != nil {
 				writeStudentError(w, http.StatusInternalServerError, "Could not read enrolled courses")
 				return
 			}
@@ -167,6 +184,7 @@ func EnrollStudent(w http.ResponseWriter, r *http.Request) {
 				"difficulty": difficulty,
 				"instructor_name": instructorName,
 				"status": status,
+				"resume_lesson_id": resumeLessonID,
 				"enrolled_at": enrolledAt,
 				"completed_at": completedAt,
 			})
