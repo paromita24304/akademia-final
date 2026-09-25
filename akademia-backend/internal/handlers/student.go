@@ -81,6 +81,41 @@ func writeStudentError(w http.ResponseWriter, status int, message string) {
 	json.NewEncoder(w).Encode(map[string]string{"message": message})
 }
 
+// reconcileAssignmentProgress removes old invalid progress records created before
+// assignment uploads were enforced. A submitted file is required for completion.
+func reconcileAssignmentProgress(studentID int) {
+	_, _ = config.DB.Exec(`
+		UPDATE student_lesson_progress p
+		SET completed = FALSE, completed_at = NULL, updated_at = NOW()
+		FROM platform_lessons l
+		JOIN platform_modules m ON m.id = l.module_id
+		WHERE p.user_id = $1
+		  AND p.lesson_id = l.id
+		  AND p.course_id = m.course_id
+		  AND p.completed = TRUE
+		  AND LOWER(l.lesson_type) = 'assignment'
+		  AND NOT EXISTS (
+			SELECT 1 FROM student_assignment_submissions s
+			WHERE s.student_id = p.user_id AND s.course_id = p.course_id AND s.lesson_id = p.lesson_id
+		  )
+	`, studentID)
+
+	_, _ = config.DB.Exec(`
+		UPDATE student_enrollments e
+		SET status = 'in-progress', completed_at = NULL, updated_at = NOW()
+		WHERE e.user_id = $1
+		  AND e.status = 'completed'
+		  AND EXISTS (
+			SELECT 1
+			FROM platform_lessons l
+			JOIN platform_modules m ON m.id = l.module_id
+			LEFT JOIN student_lesson_progress p
+			  ON p.user_id = e.user_id AND p.course_id = e.course_id AND p.lesson_id = l.id AND p.completed = TRUE
+			WHERE m.course_id = e.course_id AND p.lesson_id IS NULL
+		  )
+	`, studentID)
+}
+
 // StudentState returns the logged-in student's enrollment and lesson progress.
 func StudentState(w http.ResponseWriter, r *http.Request) {
 	student, err := currentStudent(r)
@@ -88,6 +123,7 @@ func StudentState(w http.ResponseWriter, r *http.Request) {
 		writeStudentError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
+	reconcileAssignmentProgress(student.UserID)
 
 	enrollments := make([]enrollment, 0)
 	rows, err := config.DB.Query(`SELECT course_id, status, enrolled_at, completed_at FROM student_enrollments WHERE user_id = $1 ORDER BY enrolled_at DESC`, student.UserID)
