@@ -18,23 +18,44 @@ func StudentDashboardSync(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var coursesCompleted, minutesLearned, quizAttempts, quizzesPassed, assignmentsSubmitted int
-	if err := config.DB.QueryRow(`SELECT COUNT(*) FROM student_enrollments WHERE user_id=$1 AND status='completed'`, student.UserID).Scan(&coursesCompleted); err != nil {
+	if err := config.DB.QueryRow(`SELECT COUNT(*)
+		FROM student_enrollments e
+		JOIN platform_courses c ON c.id=e.course_id
+		WHERE e.user_id=$1 AND e.status='completed'`, student.UserID).Scan(&coursesCompleted); err != nil {
 		writeStudentError(w, http.StatusInternalServerError, "Could not load dashboard")
 		return
 	}
-	_ = config.DB.QueryRow(`SELECT COALESCE(SUM(duration_minutes),0) FROM student_lesson_progress WHERE user_id=$1 AND completed=TRUE`, student.UserID).Scan(&minutesLearned)
-	_ = config.DB.QueryRow(`SELECT COUNT(*), COUNT(*) FILTER (WHERE score >= 80) FROM student_quiz_attempts WHERE student_id=$1`, student.UserID).Scan(&quizAttempts, &quizzesPassed)
-	_ = config.DB.QueryRow(`SELECT COUNT(*) FROM student_assignment_submissions WHERE student_id=$1`, student.UserID).Scan(&assignmentsSubmitted)
+	_ = config.DB.QueryRow(`SELECT COALESCE(SUM(p.duration_minutes),0)
+		FROM student_lesson_progress p
+		JOIN platform_courses c ON c.id=p.course_id
+		WHERE p.user_id=$1 AND p.completed=TRUE`, student.UserID).Scan(&minutesLearned)
+	_ = config.DB.QueryRow(`SELECT COUNT(*), COUNT(*) FILTER (WHERE q.score >= 80)
+		FROM student_quiz_attempts q
+		JOIN platform_lessons l ON l.id=q.quiz_id
+		JOIN platform_modules m ON m.id=l.module_id
+		JOIN platform_courses c ON c.id=m.course_id
+		WHERE q.student_id=$1`, student.UserID).Scan(&quizAttempts, &quizzesPassed)
+	_ = config.DB.QueryRow(`SELECT COUNT(*)
+		FROM student_assignment_submissions s
+		JOIN platform_courses c ON c.id=s.course_id
+		WHERE s.student_id=$1`, student.UserID).Scan(&assignmentsSubmitted)
 
 	var completedThisMonth, minutesThisWeek int
-	_ = config.DB.QueryRow(`SELECT COUNT(*) FROM student_enrollments WHERE user_id=$1 AND status='completed' AND completed_at >= date_trunc('month', NOW())`, student.UserID).Scan(&completedThisMonth)
-	_ = config.DB.QueryRow(`SELECT COALESCE(SUM(duration_minutes),0) FROM student_lesson_progress WHERE user_id=$1 AND completed=TRUE AND completed_at >= date_trunc('week', NOW())`, student.UserID).Scan(&minutesThisWeek)
+	_ = config.DB.QueryRow(`SELECT COUNT(*)
+		FROM student_enrollments e
+		JOIN platform_courses c ON c.id=e.course_id
+		WHERE e.user_id=$1 AND e.status='completed' AND e.completed_at >= date_trunc('month', NOW())`, student.UserID).Scan(&completedThisMonth)
+	_ = config.DB.QueryRow(`SELECT COALESCE(SUM(p.duration_minutes),0)
+		FROM student_lesson_progress p
+		JOIN platform_courses c ON c.id=p.course_id
+		WHERE p.user_id=$1 AND p.completed=TRUE AND p.completed_at >= date_trunc('week', NOW())`, student.UserID).Scan(&minutesThisWeek)
 
 	streak := 0
 	rows, err := config.DB.Query(`
-		SELECT DISTINCT (completed_at AT TIME ZONE 'UTC')::date
-		FROM student_lesson_progress
-		WHERE user_id=$1 AND completed=TRUE AND completed_at IS NOT NULL
+		SELECT DISTINCT (p.completed_at AT TIME ZONE 'UTC')::date
+		FROM student_lesson_progress p
+		JOIN platform_courses c ON c.id=p.course_id
+		WHERE p.user_id=$1 AND p.completed=TRUE AND p.completed_at IS NOT NULL
 		ORDER BY 1 DESC`, student.UserID)
 	if err == nil {
 		defer rows.Close()
@@ -76,6 +97,9 @@ func StudentDashboardSync(w http.ResponseWriter, r *http.Request) {
 			UNION ALL
 			SELECT 'quiz-passed'::text, 'Passed a quiz', q.score::text || '% score', q.attempted_at
 			FROM student_quiz_attempts q
+			JOIN platform_lessons l ON l.id=q.quiz_id
+			JOIN platform_modules m ON m.id=l.module_id
+			JOIN platform_courses c ON c.id=m.course_id
 			WHERE q.student_id=$1 AND q.score >= 80
 			UNION ALL
 			SELECT 'assignment-submitted'::text, 'Submitted assignment: ' || s.file_name, c.title, s.submitted_at
