@@ -65,10 +65,15 @@ export function CoursePlayerPage() {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [course, setCourse] = useState<Course | undefined>(() => (slug ? getCourseBySlug(slug) : undefined));
+  const [courseLoading, setCourseLoading] = useState(true);
 
   useEffect(() => {
-    if (!slug) return;
+    if (!slug) {
+      setCourseLoading(false);
+      return;
+    }
     let cancelled = false;
+    setCourseLoading(true);
     // Fetch course data and the student's existing submissions in parallel so
     // we can mark assignment lessons as already-submitted on first load.
     void Promise.all([
@@ -140,11 +145,13 @@ export function CoursePlayerPage() {
           progress: 0,
         };
         setCourse(mapped);
+        setCourseLoading(false);
       })
       .catch(() => {
         if (cancelled) return;
         const fallback = getCourseBySlug(slug);
         if (fallback) setCourse(fallback);
+        setCourseLoading(false);
       });
     return () => { cancelled = true; };
   }, [slug]);
@@ -187,6 +194,10 @@ export function CoursePlayerPage() {
       setSearchParams({ lesson: allLessons[0].id }, { replace: true });
     }
   }, [currentLessonId, allLessons, setSearchParams]);
+
+  if (courseLoading) {
+    return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading course…</div>;
+  }
 
   if (!course) {
     return <Navigate to="/student/browse" replace />;
