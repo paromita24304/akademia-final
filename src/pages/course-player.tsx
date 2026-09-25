@@ -238,11 +238,12 @@ export function CoursePlayerPage() {
     if (prevLesson) navigateToLesson(prevLesson.id);
   };
 
-  const lessonDone = isCompleted(currentLesson.id);
   const normalizedCurrentType = String(currentLesson.type || 'video').toLowerCase();
   const isAssignmentLesson = normalizedCurrentType === 'assignment' || Boolean(
     currentLesson.assignmentTitle || currentLesson.assignmentDescription || currentLesson.assignmentPoints,
   );
+  // A legacy completion without a submission is not a real assignment completion.
+  const lessonDone = isCompleted(currentLesson.id) && (!isAssignmentLesson || Boolean(currentLesson.assignmentSubmitted));
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
