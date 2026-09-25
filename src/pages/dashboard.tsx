@@ -12,7 +12,6 @@ import { Progress } from '@/components/ui/progress';
 import { PageHeader } from '@/components/common/page-header';
 import { StatCard } from '@/components/common/stat-card';
 import { useAuth } from '@/components/providers/auth-provider';
-import { useStudentPortalState } from '@/lib/student-api';
 import { apiRequest, getImageUrl } from '@/lib/api';
 import { formatNumber, relativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -62,12 +61,37 @@ const activityIcon: Record<DashboardActivity['type'], { icon: LucideIcon; classN
   'assignment-submitted': { icon: Upload, className: 'bg-info/10 text-info' },
 };
 
+type DashboardCache = { token: string; dashboard: DashboardData; enrollments: EnrollmentCourse[] };
+const dashboardCacheKey = 'akademia-dashboard-cache-v1';
+
+function readDashboardCache(): DashboardCache | null {
+  try {
+    const raw = sessionStorage.getItem(dashboardCacheKey);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as DashboardCache;
+    // A cache from another account must never be shown after sign-in.
+    return value.token === localStorage.getItem('akademia-token') ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDashboardCache(dashboard: DashboardData, enrollments: EnrollmentCourse[]) {
+  try {
+    sessionStorage.setItem(dashboardCacheKey, JSON.stringify({
+      token: localStorage.getItem('akademia-token'), dashboard, enrollments,
+    } satisfies DashboardCache));
+  } catch {
+    // The live database result remains usable when browser storage is unavailable.
+  }
+}
+
 export function DashboardPage() {
   const { user } = useAuth();
-  const { state } = useStudentPortalState();
-  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
-  const [enrollments, setEnrollments] = useState<EnrollmentCourse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cached = readDashboardCache();
+  const [dashboard, setDashboard] = useState<DashboardData | null>(() => cached?.dashboard ?? null);
+  const [enrollments, setEnrollments] = useState<EnrollmentCourse[]>(() => cached?.enrollments ?? []);
+  const [loading, setLoading] = useState(() => !cached);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,20 +102,19 @@ export function DashboardPage() {
           apiRequest('/student/enrollments') as Promise<{ enrollments?: EnrollmentCourse[] }>,
         ]);
         if (cancelled) return;
+        const nextEnrollments = enrollmentResponse.enrollments ?? [];
         setDashboard(summaryResponse);
-        setEnrollments(enrollmentResponse.enrollments ?? []);
+        setEnrollments(nextEnrollments);
+        writeDashboardCache(summaryResponse, nextEnrollments);
       } catch {
-        if (!cancelled) {
-          setDashboard(null);
-          setEnrollments([]);
-        }
+        // Keep the last verified values visible during a temporary backend delay.
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
     void load();
     return () => { cancelled = true; };
-  }, [state]);
+  }, []);
 
   const ongoing = enrollments.filter((course) => course.status === 'in-progress');
   const completed = enrollments.filter((course) => course.status === 'completed');
