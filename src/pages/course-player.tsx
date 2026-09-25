@@ -73,17 +73,14 @@ export function CoursePlayerPage() {
       return;
     }
     let cancelled = false;
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 12000);
     setCourseLoading(true);
-    // Fetch course data and the student's existing submissions in parallel so
-    // we can mark assignment lessons as already-submitted on first load.
-    void Promise.all([
-      apiRequest(`/courses/${encodeURIComponent(slug)}`),
-      import('@/lib/student-api')
-        .then(({ getMyAssignmentSubmissions }) => getMyAssignmentSubmissions())
-        .catch(() => [] as import('@/lib/student-api').MySubmission[]),
-    ]).then(([data, mySubmissions]) => {
+    // Load the course first. Submission history is supplementary and must not
+    // keep the video, quiz, or assignment page on a permanent loading screen.
+    void apiRequest(`/courses/${encodeURIComponent(slug)}`, { signal: controller.signal }).then((data) => {
         if (cancelled) return;
-        const submittedLessonIds = new Set(mySubmissions.map((s) => s.lesson_id));
+        window.clearTimeout(timeoutId);
         const mapped: Course = {
           id: data.id,
           slug: data.slug || data.id,
@@ -116,7 +113,7 @@ export function CoursePlayerPage() {
               assignmentDescription: lesson.assignment_instructions || lesson.assignment_description || lesson.assignmentDescription || undefined,
               assignmentPoints: lesson.assignment_points || lesson.assignmentPoints || 10,
               // Mark true when we have a submission row for this lesson
-              assignmentSubmitted: submittedLessonIds.has(lesson.id as string),
+              assignmentSubmitted: false,
               // Quiz preview metadata — used by course-detail accordion to show question count.
               // correct_choice is intentionally absent from the public API response.
               quizQuestions: Array.isArray(lesson.quiz_questions)
@@ -146,14 +143,39 @@ export function CoursePlayerPage() {
         };
         setCourse(mapped);
         setCourseLoading(false);
+
+        // Hydrate submission badges afterwards. A slow submission query never
+        // blocks access to the course itself.
+        void import('@/lib/student-api')
+          .then(({ getMyAssignmentSubmissions }) => getMyAssignmentSubmissions())
+          .then((submissions) => {
+            if (cancelled) return;
+            const submittedLessonIds = new Set(submissions.map((item) => item.lesson_id));
+            setCourse((current) => current ? {
+              ...current,
+              modules: current.modules.map((module) => ({
+                ...module,
+                lessons: module.lessons.map((lesson) => ({
+                  ...lesson,
+                  assignmentSubmitted: Boolean(lesson.assignmentSubmitted) || submittedLessonIds.has(lesson.id),
+                })),
+              })),
+            } : current);
+          })
+          .catch(() => undefined);
       })
       .catch(() => {
         if (cancelled) return;
+        window.clearTimeout(timeoutId);
         const fallback = getCourseBySlug(slug);
         if (fallback) setCourse(fallback);
         setCourseLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timeoutId);
+    };
   }, [slug]);
 
   useEffect(() => {
