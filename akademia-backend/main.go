@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"akademia-backend/internal/config"
 	"akademia-backend/internal/handlers"
@@ -24,7 +25,10 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		origin := r.Header.Get("Origin")
-		if allowedOrigins[origin] {
+		// Vite chooses the next free local port when another dev server is open.
+		// Permit localhost only; production remains restricted to FRONTEND_URL.
+		isLocalDevOrigin := strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:")
+		if allowedOrigins[origin] || isLocalDevOrigin {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 		}
