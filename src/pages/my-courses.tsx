@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Search, Clock, CircleCheck as CheckCircle2, CirclePlay as PlayCircle, Circle, Award, Trophy, ArrowRight, Download, Lock, TrendingUp, Flame, Target, Brain, Footprints, Zap, Sparkles, Rocket } from 'lucide-react';
+import { BookOpen, Search, Clock, CircleCheck as CheckCircle2, CirclePlay as PlayCircle, Award, ArrowRight, Download, Lock, TrendingUp } from 'lucide-react';
 import { PageHeader } from '@/components/common/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,11 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { courseCertificates } from '@/lib/mock-data';
 import { useLessonProgress } from '@/hooks/use-lesson-progress';
-import { getAllLessons, getStudentCourses } from '@/lib/course-utils';
+import { getAllLessons } from '@/lib/course-utils';
 import { useStudentPortalState } from '@/lib/student-api';
-import { formatDuration, formatNumber } from '@/lib/format';
-import { cn } from '@/lib/utils';
-import type { Course, CourseCertificate, Achievement } from '@/types';
+import { formatDuration } from '@/lib/format';
+import type { Course, CourseCertificate } from '@/types';
 import { apiRequest, getImageUrl } from '@/lib/api';
 
 type TabKey = 'ongoing' | 'completed' | 'pending';
