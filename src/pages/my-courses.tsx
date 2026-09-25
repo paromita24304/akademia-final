@@ -13,6 +13,7 @@ import { useLessonProgress } from '@/hooks/use-lesson-progress';
 import { getAllLessons } from '@/lib/course-utils';
 import { useStudentPortalState } from '@/lib/student-api';
 import { formatDuration } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import type { Course, CourseCertificate } from '@/types';
 import { apiRequest, getImageUrl } from '@/lib/api';
 
