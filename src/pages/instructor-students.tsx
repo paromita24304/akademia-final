@@ -86,7 +86,7 @@ export function InstructorStudentsPage() {
             progress: number;
             total_hours_spent: number;
             last_active: string;
-            status: Student['status'];
+            status: StudentCourse['status'];
             modules: Array<{ module_name: string; hours_spent: number; completed_lectures: number; total_lectures: number }>;
             submissions: Array<{ id: number; title: string; type: 'Quiz' | 'Lab' | 'Assignment'; score: string; submitted_date: string; status: 'Graded' | 'Pending' }>;
             messages: Array<{ id: number; sender: 'instructor' | 'student'; text: string; timestamp: string }>;
