@@ -140,6 +140,8 @@ export interface LearningSummary {
   skill_points: number;
   quiz_attempts: number;
   quizzes_passed: number;
+  quizzes_90_plus: number;
+  perfect_quizzes: number;
   assignments_submitted: number;
 }
 
