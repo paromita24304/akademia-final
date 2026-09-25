@@ -61,7 +61,7 @@ const activityIcon: Record<DashboardActivity['type'], { icon: LucideIcon; classN
   'assignment-submitted': { icon: Upload, className: 'bg-info/10 text-info' },
 };
 
-type DashboardCache = { token: string; dashboard: DashboardData; enrollments: EnrollmentCourse[] };
+type DashboardCache = { token: string | null; dashboard: DashboardData; enrollments: EnrollmentCourse[] };
 const dashboardCacheKey = 'akademia-dashboard-cache-v1';
 
 function readDashboardCache(): DashboardCache | null {
