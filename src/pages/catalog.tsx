@@ -155,7 +155,7 @@ export function CatalogPage() {
     });
 
     return list;
-  }, [query, category, difficulty, sort]);
+  }, [courses, query, category, difficulty, sort]);
 
   const activeFilters =
     (category !== 'All' ? 1 : 0) + (difficulty !== 'All' ? 1 : 0) + (query ? 1 : 0);
