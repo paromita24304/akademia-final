@@ -194,7 +194,6 @@ function CompletedSection({
     <div className="space-y-8">
       {completedCourses.map((course) => {
         const cert = certificates.find((c) => c.courseId === course.id);
-        const courseAchievements = allUnlockedAchievements.slice(0, 3 + Math.floor(course.progress / 50));
         return (
           <div key={course.id} className="space-y-4">
             <Card className="overflow-hidden">
@@ -269,7 +268,9 @@ function CompletedSection({
                 )}
               </CardContent>
             </Card>
-
+          </div>
+        );
+      })}
     </div>
   );
 }
