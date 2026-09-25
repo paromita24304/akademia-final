@@ -82,11 +82,10 @@ export function AchievementsPage() {
     if (!summary) return extendedAchievements.map((achievement) => ({ ...achievement, unlockedAt: null }));
     const now = new Date().toISOString();
     const rules: Record<string, boolean> = {
-      a_2: summary.quizzes_passed >= 50,
+      a_2: summary.quizzes_90_plus >= 50,
       a_3: summary.courses_completed >= 1,
       a_4: summary.current_streak >= 20,
-      a_5: summary.assignments_submitted >= 10,
-      a_12: summary.quizzes_passed >= 10,
+      a_12: summary.perfect_quizzes >= 10,
     };
     return extendedAchievements.map((achievement) => ({ ...achievement, unlockedAt: rules[achievement.id] ? now : null }));
   }, [summary]);
@@ -220,14 +219,8 @@ function AchievementCard({ achievement }: { achievement: Achievement }) {
           {cfg.label}
         </Badge>
 
-        {isUnlocked && achievement.unlockedAt && (
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Unlocked {new Date(achievement.unlockedAt).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })}
-          </p>
+        {isUnlocked && (
+          <p className="mt-2 text-[11px] text-muted-foreground">Verified from your saved learning activity</p>
         )}
       </div>
     </Card>
