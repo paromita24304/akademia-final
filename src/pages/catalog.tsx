@@ -93,9 +93,11 @@ export function CatalogPage() {
   const [sort, setSort] = useState<SortValue>('popular');
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState('');
 
-  const refreshCourses = async () => {
+  const refreshCourses = async (showError = false) => {
     try {
+      setCatalogError('');
       const token = localStorage.getItem('akademia-token');
       const response = await fetch(`${API_BASE}/api/courses`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -109,16 +111,21 @@ export function CatalogPage() {
         : [];
       setCourses(activeCourses);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not load catalog');
-      setCourses([]);
+      // Keep the last successful catalog on screen if a temporary request fails.
+      // Clearing it made approved instructor courses appear to randomly disappear.
+      const message = error instanceof Error ? error.message : 'Could not load catalog';
+      setCatalogError(message);
+      if (showError) toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    void refreshCourses();
-    const timer = window.setInterval(() => { void refreshCourses(); }, 6000);
+    void refreshCourses(true);
+    // Refresh in the background for a newly approved instructor course, without
+    // wiping the list if the backend is momentarily unavailable.
+    const timer = window.setInterval(() => { void refreshCourses(false); }, 30000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -258,6 +265,10 @@ export function CatalogPage() {
           </Button>
         </div>
       )}
+
+      {catalogError && courses.length > 0 ? (
+        <p className="text-sm text-muted-foreground">Showing the last loaded catalog. It will refresh automatically when the server reconnects.</p>
+      ) : null}
 
       {/* Results */}
       {!loading && filtered.length > 0 ? (
