@@ -17,7 +17,7 @@ func StudentDashboardSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var coursesCompleted, minutesLearned, quizAttempts, quizzesPassed, assignmentsSubmitted int
+	var coursesCompleted, minutesLearned, quizAttempts, quizzesPassed, quizzesNinetyPlus, perfectQuizzes, assignmentsSubmitted int
 	if err := config.DB.QueryRow(`SELECT COUNT(*)
 		FROM student_enrollments e
 		JOIN platform_courses c ON c.id=e.course_id
@@ -29,12 +29,15 @@ func StudentDashboardSync(w http.ResponseWriter, r *http.Request) {
 		FROM student_lesson_progress p
 		JOIN platform_courses c ON c.id=p.course_id
 		WHERE p.user_id=$1 AND p.completed=TRUE`, student.UserID).Scan(&minutesLearned)
-	_ = config.DB.QueryRow(`SELECT COUNT(*), COUNT(*) FILTER (WHERE q.score >= 80)
+	_ = config.DB.QueryRow(`SELECT COUNT(*),
+		       COUNT(*) FILTER (WHERE q.score >= 80),
+		       COUNT(*) FILTER (WHERE q.score >= 90),
+		       COUNT(*) FILTER (WHERE q.score = 100)
 		FROM student_quiz_attempts q
 		JOIN platform_lessons l ON l.id=q.quiz_id
 		JOIN platform_modules m ON m.id=l.module_id
 		JOIN platform_courses c ON c.id=m.course_id
-		WHERE q.student_id=$1`, student.UserID).Scan(&quizAttempts, &quizzesPassed)
+		WHERE q.student_id=$1`, student.UserID).Scan(&quizAttempts, &quizzesPassed, &quizzesNinetyPlus, &perfectQuizzes)
 	_ = config.DB.QueryRow(`SELECT COUNT(*)
 		FROM student_assignment_submissions s
 		JOIN platform_courses c ON c.id=s.course_id
@@ -127,6 +130,8 @@ func StudentDashboardSync(w http.ResponseWriter, r *http.Request) {
 		"skill_points": skillPoints,
 		"quiz_attempts": quizAttempts,
 		"quizzes_passed": quizzesPassed,
+		"quizzes_90_plus": quizzesNinetyPlus,
+		"perfect_quizzes": perfectQuizzes,
 		"assignments_submitted": assignmentsSubmitted,
 		"completed_this_month": completedThisMonth,
 		"minutes_this_week": minutesThisWeek,
