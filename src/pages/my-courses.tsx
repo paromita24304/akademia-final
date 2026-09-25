@@ -45,7 +45,8 @@ export function MyCoursesPage() {
   // Subscribing here makes Ongoing/Completed/Saved update as soon as the Go API
   // confirms an enrollment or lesson completion.
   const { state } = useStudentPortalState();
-  const [studentCourses, setStudentCourses] = useState<Course[]>([]);
+  type EnrolledCourse = Course & { resumeLessonId?: string };
+  const [studentCourses, setStudentCourses] = useState<EnrolledCourse[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +65,7 @@ export function MyCoursesPage() {
           difficulty?: Course['difficulty'];
           instructor_name?: string;
           status: 'saved' | 'in-progress' | 'completed';
+          resume_lesson_id?: string;
         }) => ({
           id: item.course_id,
           slug: item.slug || item.course_id,
@@ -82,6 +84,7 @@ export function MyCoursesPage() {
           modules: [],
           status: item.status === 'completed' ? 'completed' : item.status === 'in-progress' ? 'in-progress' : 'not-started',
           progress: item.status === 'completed' ? 100 : 0,
+          resumeLessonId: item.resume_lesson_id || undefined,
         })));
       } catch {
         if (!cancelled) setStudentCourses([]);
@@ -355,14 +358,16 @@ function CompletedSection({
   );
 }
 
-function OngoingCourseRow({ course }: { course: Course }) {
+function OngoingCourseRow({ course }: { course: Course & { resumeLessonId?: string } }) {
   const { completedLessons } = useLessonProgress(course.id);
   const allLessons = useMemo(() => getAllLessons(course), [course]);
   const completed = allLessons.filter((l) => completedLessons.has(l.id)).length;
   const total = allLessons.length;
   const pct = total > 0 ? Math.round((completed / total) * 100) : course.progress;
   const lastCompletedIdx = allLessons.reduce((last, l, i) => (completedLessons.has(l.id) ? i : last), -1);
-  const resumeLesson = allLessons[Math.min(lastCompletedIdx + 1, total - 1)] ?? allLessons[0];
+  // The server chooses the first unfinished lesson. It works even before the
+  // course player has loaded its full curriculum into this page.
+  const resumeLesson = course.resumeLessonId || allLessons[Math.min(lastCompletedIdx + 1, total - 1)]?.id || allLessons[0]?.id;
 
   return (
     <Card>
@@ -392,7 +397,7 @@ function OngoingCourseRow({ course }: { course: Course }) {
         </div>
         <div className="flex flex-col gap-2 sm:items-end">
           <Button size="sm" asChild>
-            <Link to={`/student/courses/${course.slug}/learn?lesson=${resumeLesson?.id ?? ''}`}>
+            <Link to={`/student/courses/${course.slug}/learn${resumeLesson ? `?lesson=${encodeURIComponent(resumeLesson)}` : ''}`}>
               <PlayCircle className="mr-2 h-4 w-4" />
               Resume
             </Link>
