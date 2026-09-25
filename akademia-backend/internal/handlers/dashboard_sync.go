@@ -16,6 +16,7 @@ func StudentDashboardSync(w http.ResponseWriter, r *http.Request) {
 		writeStudentError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
+	reconcileAssignmentProgress(student.UserID)
 
 	var coursesCompleted, minutesLearned, quizAttempts, quizzesPassed, quizzesNinetyPlus, perfectQuizzes, assignmentsSubmitted int
 	if err := config.DB.QueryRow(`SELECT COUNT(*)
