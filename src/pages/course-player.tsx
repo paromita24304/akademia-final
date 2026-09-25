@@ -212,7 +212,7 @@ export function CoursePlayerPage() {
     setMobileMenuOpen(false);
   };
 
-  const handleComplete = () => {
+  const completeCurrentLesson = () => {
     markComplete(currentLesson.id, completedCount + (lessonDone ? 0 : 1) === allLessons.length, currentLesson.durationMinutes);
     toast.success('Lesson completed', {
       description: nextLesson ? 'Moving to the next lesson.' : 'You finished the course!',
@@ -220,6 +220,14 @@ export function CoursePlayerPage() {
     if (nextLesson) {
       setTimeout(() => navigateToLesson(nextLesson.id), 600);
     }
+  };
+
+  const handleComplete = () => {
+    if (isAssignmentLesson && !currentLesson.assignmentSubmitted) {
+      toast.error('Submit your PDF before completing this assignment.');
+      return;
+    }
+    completeCurrentLesson();
   };
 
   const goToNext = () => {
@@ -351,7 +359,7 @@ export function CoursePlayerPage() {
                     ) : normalizedCurrentType === 'video' && currentLesson.pdfUrl ? (
                       <PdfViewer url={currentLesson.pdfUrl} />
                     ) : isAssignmentLesson ? (
-                      <AssignmentContent courseId={course.id} lesson={currentLesson} onComplete={handleComplete} />
+                      <AssignmentContent courseId={course.id} lesson={currentLesson} onComplete={completeCurrentLesson} />
                     ) : normalizedCurrentType === 'quiz' ? (
                       <div className="rounded-xl border border-info/20 bg-info/5 p-6 text-center">
                         <ListChecks className="mx-auto h-10 w-10 text-info" />
@@ -433,7 +441,7 @@ export function CoursePlayerPage() {
                       onClick={handleComplete}
                       variant={lessonDone ? 'secondary' : 'default'}
                       size="sm"
-                      disabled={progressLoading}
+                      disabled={progressLoading || (isAssignmentLesson && !currentLesson.assignmentSubmitted && !lessonDone)}
                     >
                       {progressLoading ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
