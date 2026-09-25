@@ -14,5 +14,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
       - run: npm ci
       - run: npm run build
+      - run: go test ./...
+        working-directory: akademia-backend
