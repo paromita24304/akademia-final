@@ -240,6 +240,37 @@ func SaveLessonProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// An assignment counts as completed only after a real file submission.
+	// Validate this on the server so the browser cannot unlock later lessons by
+	// sending a completion request directly.
+	if input.Completed {
+		var lessonType string
+		err = config.DB.QueryRow(
+			`SELECT l.lesson_type
+			 FROM platform_lessons l
+			 JOIN platform_modules m ON m.id = l.module_id
+			 WHERE l.id = $1 AND m.course_id = $2`,
+			strings.TrimSpace(input.LessonID), strings.TrimSpace(input.CourseID),
+		).Scan(&lessonType)
+		if err != nil {
+			writeStudentError(w, http.StatusBadRequest, "This lesson does not belong to the selected course")
+			return
+		}
+		if strings.EqualFold(lessonType, "assignment") {
+			var submitted bool
+			if err = config.DB.QueryRow(
+				`SELECT EXISTS(
+					SELECT 1 FROM student_assignment_submissions
+					WHERE student_id = $1 AND course_id = $2 AND lesson_id = $3
+				)`,
+				student.UserID, strings.TrimSpace(input.CourseID), strings.TrimSpace(input.LessonID),
+			).Scan(&submitted); err != nil || !submitted {
+				writeStudentError(w, http.StatusBadRequest, "Submit your assignment file before completing this lesson")
+				return
+			}
+		}
+	}
+
 	tx, err := config.DB.Begin()
 	if err != nil {
 		writeStudentError(w, http.StatusInternalServerError, "Could not save progress")
