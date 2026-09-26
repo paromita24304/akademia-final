@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Upload, Users, BookOpen } from 'lucide-react';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { AuthProvider } from '@/components/providers/auth-provider';
@@ -30,6 +30,11 @@ import { InstructorAiToolsPage } from '@/pages/instructor-ai-tools';
 import { CourseFeedbackPage } from '@/pages/course-feedback';
 import { InstructorMessagesPage } from '@/pages/instructor-messages';
 import { AdminCoursesPage } from '@/pages/admin-courses';
+
+function LegacyCourseRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={id ? `/student/courses/${encodeURIComponent(id)}` : '/student/browse'} replace />;
+}
 
 export default function App() {
   return (
@@ -72,7 +77,7 @@ export default function App() {
               </Route>
             </Route>
 
-            <Route path="/courses/:id" element={<CourseDetailPage />} />
+            <Route path="/courses/:id" element={<LegacyCourseRedirect />} />
 
             {/* Instructor routes */}
             <Route path="/instructor" element={<ProtectedRoute allowedRole="instructor" />}>
