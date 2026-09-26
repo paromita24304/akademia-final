@@ -379,18 +379,20 @@ export function CoursePlayerPage() {
                       <VideoPlayer src={currentLesson.videoUrl} onEnded={handleComplete} onNext={nextLesson ? goToNext : undefined} />
                     ) : normalizedCurrentType === 'reading' && currentLesson.readingContent ? (
                       <ReadingContent content={currentLesson.readingContent} />
-                    ) : normalizedCurrentType === 'reading' && currentLesson.pdfUrl ? (
+                    ) : normalizedCurrentType === 'reading' && currentLesson.pdfUrl && isPdfDocument ? (
                       <PdfViewer
                         url={currentLesson.pdfUrl}
                         fileName={`${currentLesson.title}.pdf`}
                         onReachLastPage={() => { if (!lessonDone) completeCurrentLesson(); }}
                       />
-                    ) : normalizedCurrentType === 'video' && currentLesson.pdfUrl ? (
+                    ) : normalizedCurrentType === 'video' && currentLesson.pdfUrl && isPdfDocument ? (
                       <PdfViewer
                         url={currentLesson.pdfUrl}
                         fileName={`${currentLesson.title}.pdf`}
                         onReachLastPage={() => { if (!lessonDone) completeCurrentLesson(); }}
                       />
+                    ) : (normalizedCurrentType === 'reading' || normalizedCurrentType === 'video') && currentLesson.pdfUrl ? (
+                      <UnsupportedDocumentNotice url={currentLesson.pdfUrl} title={currentLesson.title} />
                     ) : isAssignmentLesson ? (
                       <AssignmentContent courseId={course.id} lesson={currentLesson} onComplete={completeCurrentLesson} />
                     ) : normalizedCurrentType === 'quiz' ? (
@@ -561,6 +563,23 @@ export function CoursePlayerPage() {
 }
 
 // --- Sub-components ---
+
+function UnsupportedDocumentNotice({ url, title }: { url: string; title: string }) {
+  return (
+    <div className="grid min-h-[320px] place-items-center rounded-xl border border-dashed border-border bg-muted/20 p-6 text-center">
+      <div>
+        <FileText className="mx-auto h-10 w-10 text-muted-foreground" />
+        <h3 className="mt-3 font-semibold text-foreground">{title} is not a PDF document</h3>
+        <p className="mt-1 max-w-md text-sm text-muted-foreground">
+          PowerPoint files are not opened automatically. Upload a real PDF version to show it inside the lesson.
+        </p>
+        <Button variant="outline" className="mt-4" asChild>
+          <a href={url} download><Download className="mr-2 h-4 w-4" />Download file</a>
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function LockedLessonNotice({ prevLessonTitle }: { prevLessonTitle: string }) {
   return (
