@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import { Upload, Users, BookOpen } from 'lucide-react';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { AuthProvider } from '@/components/providers/auth-provider';
@@ -33,7 +33,8 @@ import { AdminCoursesPage } from '@/pages/admin-courses';
 
 function LegacyCourseRedirect() {
   const { id } = useParams<{ id: string }>();
-  return <Navigate to={id ? `/student/courses/${encodeURIComponent(id)}` : '/student/browse'} replace />;
+  const location = useLocation();
+  return <Navigate to={id ? `/student/courses/${encodeURIComponent(id)}` : '/student/browse'} state={location.state} replace />;
 }
 
 export default function App() {
