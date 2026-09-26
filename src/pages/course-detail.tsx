@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams, Navigate, useNavigate } from 'react-router-dom';
+import { Link, useParams, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   Star,
   Clock,
@@ -44,7 +44,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/components/providers/auth-provider';
 import { enrollStudent, submitStudentFeedback, useStudentPortalState } from '@/lib/student-api';
 import { toast } from 'sonner';
-import type { Lesson } from '@/types';
+import type { Course, Lesson } from '@/types';
 import { apiRequest, getImageUrl, resolveBackendAssetUrl } from '@/lib/api';
 import { CourseMessaging } from '@/components/player/course-messaging';
 
@@ -56,6 +56,10 @@ const lessonTypeIcon: Record<Lesson['type'], typeof Video> = {
   'ai-coaching': MessageSquare,
 };
 
+// The catalog hands this page a preview immediately; the full course is cached after
+// the first fetch so returning to it never recreates a blank loading screen.
+const courseDetailCache = new Map<string, Course>();
+
 const difficultyStyles: Record<string, string> = {
   Beginner: 'bg-success/10 text-success border-success/20',
   Intermediate: 'bg-info/10 text-info border-info/20',
@@ -66,13 +70,17 @@ export function CourseDetailPage() {
   const { slug, id } = useParams<{ slug?: string; id?: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const courseReference = id || slug || '';
+  const previewCourse = (location.state as { coursePreview?: Course } | null)?.coursePreview;
+  const cachedCourse = courseReference ? courseDetailCache.get(courseReference) : undefined;
   const { state } = useStudentPortalState();
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [feedbackRating, setFeedbackRating] = useState(5);
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
-  const [course, setCourse] = useState<ReturnType<typeof getCourseBySlug> | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
+  const [course, setCourse] = useState<Course | undefined>(() => cachedCourse ?? previewCourse);
+  const [loading, setLoading] = useState(() => !(cachedCourse ?? previewCourse));
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [discussions, setDiscussions] = useState<import('@/lib/student-api').Discussion[]>([]);
 
@@ -81,8 +89,19 @@ export function CourseDetailPage() {
 
     const resolveCourse = async () => {
       try {
-        const courseReference = id || slug;
-        if (courseReference) {
+        if (!courseReference) {
+          if (!cancelled) { setCourse(undefined); setLoading(false); }
+          return;
+        }
+        const cached = courseDetailCache.get(courseReference);
+        if (cached && !cancelled) {
+          setCourse(cached);
+          setLoading(false);
+        } else if (previewCourse && !cancelled) {
+          setCourse(previewCourse);
+          setLoading(false);
+        }
+        {
           const data = await apiRequest(`/courses/${encodeURIComponent(courseReference)}`);
           // Display course data immediately. Assignment submission badges are
           // supplemental and must never delay this page.
@@ -139,6 +158,8 @@ export function CourseDetailPage() {
             status: 'not-started',
             progress: 0,
           } as any;
+          courseDetailCache.set(data.id, mapped);
+          if (data.slug) courseDetailCache.set(data.slug, mapped);
           if (!cancelled) setCourse(mapped);
           // Hydrate submitted-assignment badges after the page is visible.
           void import('@/lib/student-api')
@@ -179,7 +200,7 @@ export function CourseDetailPage() {
 
     void resolveCourse();
     return () => { cancelled = true; };
-  }, [id, slug, user?.role]);
+  }, [courseReference, previewCourse, user?.role]);
 
   const { isCompleted, markComplete } = useLessonProgress(course?.id ?? '');
 
