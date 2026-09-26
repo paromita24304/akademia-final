@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   Star,
@@ -60,6 +60,16 @@ const lessonTypeIcon: Record<Lesson['type'], typeof Video> = {
 // the first fetch so returning to it never recreates a blank loading screen.
 const courseDetailCache = new Map<string, Course>();
 
+function getStoredCoursePreview(reference: string): Course | undefined {
+  try {
+    const raw = sessionStorage.getItem('akademia-course-previews');
+    const previews = raw ? JSON.parse(raw) as Course[] : [];
+    return previews.find((course) => course.id === reference || course.slug === reference);
+  } catch {
+    return undefined;
+  }
+}
+
 const difficultyStyles: Record<string, string> = {
   Beginner: 'bg-success/10 text-success border-success/20',
   Intermediate: 'bg-info/10 text-info border-info/20',
@@ -73,14 +83,16 @@ export function CourseDetailPage() {
   const location = useLocation();
   const courseReference = id || slug || '';
   const previewCourse = (location.state as { coursePreview?: Course } | null)?.coursePreview;
+  const storedPreview = useMemo(() => courseReference ? getStoredCoursePreview(courseReference) : undefined, [courseReference]);
+  const visiblePreview = previewCourse ?? storedPreview;
   const cachedCourse = courseReference ? courseDetailCache.get(courseReference) : undefined;
   const { state } = useStudentPortalState();
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [feedbackRating, setFeedbackRating] = useState(5);
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
-  const [course, setCourse] = useState<Course | undefined>(() => cachedCourse ?? previewCourse);
-  const [loading, setLoading] = useState(() => !(cachedCourse ?? previewCourse));
+  const [course, setCourse] = useState<Course | undefined>(() => cachedCourse ?? visiblePreview);
+  const [loading, setLoading] = useState(() => !(cachedCourse ?? visiblePreview));
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [discussions, setDiscussions] = useState<import('@/lib/student-api').Discussion[]>([]);
 
@@ -97,8 +109,8 @@ export function CourseDetailPage() {
         if (cached && !cancelled) {
           setCourse(cached);
           setLoading(false);
-        } else if (previewCourse && !cancelled) {
-          setCourse(previewCourse);
+        } else if (visiblePreview && !cancelled) {
+          setCourse(visiblePreview);
           setLoading(false);
         }
         {
@@ -200,7 +212,7 @@ export function CourseDetailPage() {
 
     void resolveCourse();
     return () => { cancelled = true; };
-  }, [courseReference, previewCourse, user?.role]);
+  }, [courseReference, visiblePreview, user?.role]);
 
   const { isCompleted, markComplete } = useLessonProgress(course?.id ?? '');
 
