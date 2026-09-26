@@ -1050,6 +1050,9 @@ func GradeAssignmentSubmission(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[GradeAssignment] Grade saved — student=%d course=%s lesson=%s score=%d rows_affected=%d", req.StudentID, req.CourseID, req.LessonID, req.Score, rows)
+	var courseTitle string
+	_ = config.DB.QueryRow(`SELECT title FROM platform_courses WHERE id=$1`, req.CourseID).Scan(&courseTitle)
+	createNotification(req.StudentID, "assignment_graded", "Assignment graded", courseTitle+" — score: "+strconv.Itoa(req.Score)+"/100", "/student/courses/"+req.CourseID)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"student_id": req.StudentID,
 		"course_id":  req.CourseID,
