@@ -908,6 +908,17 @@ func UpdateCourseModerationStatus(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"message": "Course not found"})
 		return
 	}
+	if newStatus == "approved" {
+		var title string
+		_ = config.DB.QueryRow(`SELECT title FROM platform_courses WHERE id=$1`, courseID).Scan(&title)
+		if studentRows, queryErr := config.DB.Query(`SELECT id FROM users WHERE role='student'`); queryErr == nil {
+			defer studentRows.Close()
+			for studentRows.Next() {
+				var studentID int
+				if studentRows.Scan(&studentID) == nil { createNotification(studentID, "new_course", "New course available", title+" is now available to enroll.", "/student/courses/"+courseID) }
+			}
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": courseID, "status": newStatus, "message": "Course moderation status updated"})
 }
 
