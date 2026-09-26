@@ -135,13 +135,14 @@ export function PdfViewer({ url, fileName = 'Document.pdf', onReachLastPage }: P
         {loading ? (
           <div className="grid min-h-[520px] place-items-center text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading document…</div>
         ) : error ? (
-          // Chrome's native PDF viewer is a reliable visual fallback if PDF.js cannot parse a file.
-          // The normal PDF.js path remains responsible for final-page completion tracking.
-          <iframe
-            title={fileName}
-            src={url}
-            className="min-h-[520px] w-full rounded border-0 bg-white"
-          />
+          <div className="grid min-h-[520px] place-items-center p-6 text-center text-sm text-muted-foreground">
+            <div>
+              <p>{error}</p>
+              <Button variant="outline" className="mt-3" asChild>
+                <a href={url} download={fileName}><Download className="mr-2 h-4 w-4" />Download document</a>
+              </Button>
+            </div>
+          </div>
         ) : (
           <canvas ref={canvasRef} className="mx-auto max-w-full rounded bg-white shadow-sm" />
         )}
