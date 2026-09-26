@@ -59,7 +59,7 @@ func serveUploadAsset(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.EqualFold(filepath.Ext(relativePath), ".pdf") {
 		w.Header().Set("Content-Type", "application/pdf")
-		w.Header().Set("Content-Disposition", "inline; filename=\\\""+filepath.Base(relativePath)+"\\\"")
+		w.Header().Set("Content-Disposition", "inline; filename=\""+filepath.Base(relativePath)+"\"")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 	}
 	http.ServeFile(w, r, filepath.Join("uploads", relativePath))
