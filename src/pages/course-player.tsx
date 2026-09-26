@@ -267,7 +267,8 @@ export function CoursePlayerPage() {
   // A legacy completion without a submission is not a real assignment completion.
   const lessonDone = isCompleted(currentLesson.id) && (!isAssignmentLesson || Boolean(currentLesson.assignmentSubmitted));
   // PDFs are embedded in the lesson itself. Keep other files in the material list.
-  const nonPdfResources = (currentLesson.resources ?? []).filter((resource) => !/\\.pdf(?:$|\\?)/i.test(resource.url));
+  const isPdfDocument = /\.pdf(?:$|\?)/i.test(currentLesson.pdfUrl ?? '');
+  const nonPdfResources = (currentLesson.resources ?? []).filter((resource) => !/\.pdf(?:$|\?)/i.test(resource.url));
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
@@ -742,8 +743,8 @@ function AssignmentContent({
   // from the server before the component first mounts.
   const [submitted, setSubmitted] = useState(lesson.assignmentSubmitted ?? false);
   const [submittedFileName, setSubmittedFileName] = useState<string | null>(null);
-  const referencePdf = lesson.pdfUrl ?? lesson.resources?.find((resource) => /\\.pdf(?:$|\\?)/i.test(resource.url))?.url;
-  const nonPdfReferences = (lesson.resources ?? []).filter((resource) => !/\\.pdf(?:$|\\?)/i.test(resource.url));
+  const referencePdf = lesson.pdfUrl ?? lesson.resources?.find((resource) => /\.pdf(?:$|\?)/i.test(resource.url))?.url;
+  const nonPdfReferences = (lesson.resources ?? []).filter((resource) => !/\.pdf(?:$|\?)/i.test(resource.url));
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = e.target.files?.[0] ?? null;
