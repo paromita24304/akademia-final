@@ -723,6 +723,8 @@ function AssignmentContent({
   // from the server before the component first mounts.
   const [submitted, setSubmitted] = useState(lesson.assignmentSubmitted ?? false);
   const [submittedFileName, setSubmittedFileName] = useState<string | null>(null);
+  const referencePdf = lesson.pdfUrl ?? lesson.resources?.find((resource) => /\\.pdf(?:$|\\?)/i.test(resource.url))?.url;
+  const nonPdfReferences = (lesson.resources ?? []).filter((resource) => !/\\.pdf(?:$|\\?)/i.test(resource.url));
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = e.target.files?.[0] ?? null;
@@ -795,14 +797,23 @@ function AssignmentContent({
           </div>
         )}
 
-        {/* Downloadable reference files */}
-        {lesson.resources && lesson.resources.length > 0 && (
+        {/* The assignment document is shown directly in the page. Reading it does not submit the assignment. */}
+        {referencePdf && (
           <div className="mb-5">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Reference files
+              Assignment document
+            </p>
+            <PdfViewer url={referencePdf} fileName={\`${lesson.title}.pdf\`} />
+          </div>
+        )}
+
+        {nonPdfReferences.length > 0 && (
+          <div className="mb-5">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Other reference files
             </p>
             <ul className="space-y-1.5">
-              {lesson.resources.map((r) => (
+              {nonPdfReferences.map((r) => (
                 <li key={r.url}>
                   <a
                     href={r.url}
