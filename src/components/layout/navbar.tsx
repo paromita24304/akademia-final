@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -31,6 +31,7 @@ import { CommandMenu } from '@/components/common/command-menu';
 import { useAuth, roleDashboardPath } from '@/components/providers/auth-provider';
 import { initials } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { apiRequest } from '@/lib/api';
 
 const roleIcon = {
   student: GraduationCap,
@@ -52,6 +53,14 @@ export function Navbar({ onMenuClick }: NavbarProps) {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const [commandOpen, setCommandOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Array<{ id: number; title: string; body: string; link: string; is_read: boolean }>>([]);
+
+  useEffect(() => {
+    const load = () => { void apiRequest('/notifications').then((data) => setNotifications(data.notifications ?? [])).catch(() => undefined); };
+    load();
+    const timer = window.setInterval(load, 30000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const displayName = user?.name ?? 'Learner';
   const email = user?.email ?? '';
@@ -66,6 +75,8 @@ export function Navbar({ onMenuClick }: NavbarProps) {
   };
 
   const settingsPath = `${roleDashboardPath[role].replace('/dashboard', '')}/settings`;
+  const unreadNotifications = notifications.filter((item) => !item.is_read).length;
+  const markNotificationsRead = () => { void apiRequest('/notifications/read', { method: 'POST', body: JSON.stringify({}) }).then(() => setNotifications((items) => items.map((item) => ({ ...item, is_read: true })))).catch(() => undefined); };
 
   return (
     <>
@@ -112,15 +123,19 @@ export function Navbar({ onMenuClick }: NavbarProps) {
 
           <ThemeToggle />
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative text-muted-foreground hover:text-foreground"
-            aria-label="Notifications"
-          >
-            <Bell className="h-[1.15rem] w-[1.15rem]" />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
-          </Button>
+          <DropdownMenu onOpenChange={(open) => { if (open && unreadNotifications) markNotificationsRead(); }}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground" aria-label="Notifications">
+                <Bell className="h-[1.15rem] w-[1.15rem]" />
+                {unreadNotifications > 0 && <span className="absolute right-2 top-2 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground ring-2 ring-background">{unreadNotifications > 9 ? '9+' : unreadNotifications}</span>}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+              <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {notifications.length === 0 ? <p className="px-3 py-5 text-center text-sm text-muted-foreground">No notifications yet</p> : notifications.slice(0, 6).map((item) => <DropdownMenuItem key={item.id} className="items-start whitespace-normal py-3" onClick={() => item.link && navigate(item.link)}><Bell className="mr-2 mt-0.5 h-4 w-4 shrink-0 text-primary" /><span><span className="block text-sm font-medium">{item.title}</span><span className="mt-0.5 block text-xs text-muted-foreground">{item.body}</span></span></DropdownMenuItem>)}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
