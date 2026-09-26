@@ -8,6 +8,8 @@ interface PdfViewerProps {
   onReachLastPage?: () => void;
 }
 
+type PdfSource = string | { url: string; disableRange?: boolean; disableStream?: boolean; disableAutoFetch?: boolean };
+
 type PdfDocument = {
   numPages: number;
   getPage: (page: number) => Promise<{
@@ -19,14 +21,14 @@ type PdfDocument = {
 const pdfJsUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 const pdfWorkerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-function loadPdfJs(): Promise<{ getDocument: (url: string) => { promise: Promise<PdfDocument> }; GlobalWorkerOptions: { workerSrc: string } }> {
+function loadPdfJs(): Promise<{ getDocument: (source: PdfSource) => { promise: Promise<PdfDocument> }; GlobalWorkerOptions: { workerSrc: string } }> {
   const existing = (window as Window & { pdfjsLib?: unknown }).pdfjsLib;
-  if (existing) return Promise.resolve(existing as { getDocument: (url: string) => { promise: Promise<PdfDocument> }; GlobalWorkerOptions: { workerSrc: string } });
+  if (existing) return Promise.resolve(existing as { getDocument: (source: PdfSource) => { promise: Promise<PdfDocument> }; GlobalWorkerOptions: { workerSrc: string } });
 
   return new Promise((resolve, reject) => {
     const script = document.querySelector<HTMLScriptElement>('script[data-akademia-pdfjs]');
     if (script) {
-      script.addEventListener('load', () => resolve((window as unknown as { pdfjsLib: { getDocument: (url: string) => { promise: Promise<PdfDocument> }; GlobalWorkerOptions: { workerSrc: string } } }).pdfjsLib), { once: true });
+      script.addEventListener('load', () => resolve((window as unknown as { pdfjsLib: { getDocument: (source: PdfSource) => { promise: Promise<PdfDocument> }; GlobalWorkerOptions: { workerSrc: string } } }).pdfjsLib), { once: true });
       script.addEventListener('error', () => reject(new Error('Could not load PDF reader')), { once: true });
       return;
     }
@@ -36,7 +38,7 @@ function loadPdfJs(): Promise<{ getDocument: (url: string) => { promise: Promise
     next.async = true;
     next.dataset.akademiaPdfjs = 'true';
     next.onload = () => {
-      const library = (window as Window & { pdfjsLib?: { getDocument: (url: string) => { promise: Promise<PdfDocument> }; GlobalWorkerOptions: { workerSrc: string } } }).pdfjsLib;
+      const library = (window as Window & { pdfjsLib?: { getDocument: (source: PdfSource) => { promise: Promise<PdfDocument> }; GlobalWorkerOptions: { workerSrc: string } } }).pdfjsLib;
       if (library) resolve(library); else reject(new Error('PDF reader did not load'));
     };
     next.onerror = () => reject(new Error('Could not load PDF reader'));
@@ -66,7 +68,7 @@ export function PdfViewer({ url, fileName = 'Document.pdf', onReachLastPage }: P
     void loadPdfJs()
       .then((pdfjs) => {
         pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-        return pdfjs.getDocument(url).promise;
+        return pdfjs.getDocument({ url, disableRange: true, disableStream: true, disableAutoFetch: true }).promise;
       })
       .then((document) => {
         if (cancelled) return;
