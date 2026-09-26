@@ -83,6 +83,8 @@ func main() {
 	http.HandleFunc("/api/login", enableCORS(handlers.Login))
 	http.HandleFunc("/api/admin/login", enableCORS(handlers.AdminLogin))
 	http.HandleFunc("/api/change-password", enableCORS(handlers.ChangePassword))
+	http.HandleFunc("/api/notifications", enableCORS(handlers.Notifications))
+	http.HandleFunc("/api/notifications/read", enableCORS(handlers.MarkNotificationsRead))
 	http.HandleFunc("/api/auth/send-otp", enableCORS(handlers.SendOTP))
 	http.HandleFunc("/api/auth/verify-otp", enableCORS(handlers.VerifyOTP))
 	http.HandleFunc("/api/auth/forgot-password", enableCORS(handlers.ForgotPassword))
