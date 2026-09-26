@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"akademia-backend/internal/config"
@@ -45,6 +46,23 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// serveUploadAsset serves course media from the local upload folder. PDFs are
+// explicitly sent inline so a View link opens them in the browser instead of
+// forcing a download. The frontend's Download button still controls downloads.
+func serveUploadAsset(w http.ResponseWriter, r *http.Request) {
+	relativePath := filepath.Clean(strings.TrimPrefix(r.URL.Path, "/uploads/"))
+	if relativePath == "." || strings.HasPrefix(relativePath, "..") {
+		http.NotFound(w, r)
+		return
+	}
+	if strings.EqualFold(filepath.Ext(relativePath), ".pdf") {
+		w.Header().Set("Content-Type", "application/pdf")
+		w.Header().Set("Content-Disposition", "inline; filename=\\\""+filepath.Base(relativePath)+"\\\"")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+	}
+	http.ServeFile(w, r, filepath.Join("uploads", relativePath))
+}
+
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("Note: No .env file found, using system environment variables.")
@@ -56,10 +74,7 @@ func main() {
 	config.ConnectDB()
 
 	// Serve uploaded course assets from the same backend origin used by the API.
-	uploads := http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads")))
-	http.Handle("/uploads/", enableCORS(func(w http.ResponseWriter, r *http.Request) {
-		uploads.ServeHTTP(w, r)
-	}))
+	http.Handle("/uploads/", enableCORS(serveUploadAsset))
 
 	// Authentication routes
 	http.HandleFunc("/api/register", enableCORS(handlers.Register))
