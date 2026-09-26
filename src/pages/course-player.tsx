@@ -382,13 +382,13 @@ export function CoursePlayerPage() {
                     ) : normalizedCurrentType === 'reading' && currentLesson.pdfUrl ? (
                       <PdfViewer
                         url={currentLesson.pdfUrl}
-                        fileName={\`${currentLesson.title}.pdf\`}
+                        fileName={`${currentLesson.title}.pdf`}
                         onReachLastPage={() => { if (!lessonDone) completeCurrentLesson(); }}
                       />
                     ) : normalizedCurrentType === 'video' && currentLesson.pdfUrl ? (
                       <PdfViewer
                         url={currentLesson.pdfUrl}
-                        fileName={\`${currentLesson.title}.pdf\`}
+                        fileName={`${currentLesson.title}.pdf`}
                         onReachLastPage={() => { if (!lessonDone) completeCurrentLesson(); }}
                       />
                     ) : isAssignmentLesson ? (
@@ -803,7 +803,7 @@ function AssignmentContent({
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Assignment document
             </p>
-            <PdfViewer url={referencePdf} fileName={\`${lesson.title}.pdf\`} />
+            <PdfViewer url={referencePdf} fileName={`${lesson.title}.pdf`} />
           </div>
         )}
 
