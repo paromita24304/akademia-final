@@ -38,7 +38,8 @@ export function CourseCard({ course }: { course: Course }) {
   if (course.externalUrl) return <a href={course.externalUrl} target="_blank" rel="noreferrer" className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-foreground/5">{content}</a>;
   return (
     <Link
-      to={`/courses/${course.id}`}
+      to={`/student/courses/${course.slug || course.id}`}
+      state={{ coursePreview: course }}
       className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-foreground/5"
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-muted">
