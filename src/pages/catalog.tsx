@@ -110,6 +110,7 @@ export function CatalogPage() {
             .map(mapApiCourse)
         : [];
       setCourses(activeCourses);
+      sessionStorage.setItem('akademia-course-previews', JSON.stringify(activeCourses));
     } catch (error) {
       // Keep the last successful catalog on screen if a temporary request fails.
       // Clearing it made approved instructor courses appear to randomly disappear.
