@@ -266,6 +266,8 @@ export function CoursePlayerPage() {
   );
   // A legacy completion without a submission is not a real assignment completion.
   const lessonDone = isCompleted(currentLesson.id) && (!isAssignmentLesson || Boolean(currentLesson.assignmentSubmitted));
+  // PDFs are embedded in the lesson itself. Keep other files in the material list.
+  const nonPdfResources = (currentLesson.resources ?? []).filter((resource) => !/\\.pdf(?:$|\\?)/i.test(resource.url));
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
@@ -378,9 +380,17 @@ export function CoursePlayerPage() {
                     ) : normalizedCurrentType === 'reading' && currentLesson.readingContent ? (
                       <ReadingContent content={currentLesson.readingContent} />
                     ) : normalizedCurrentType === 'reading' && currentLesson.pdfUrl ? (
-                      <PdfViewer url={currentLesson.pdfUrl} />
+                      <PdfViewer
+                        url={currentLesson.pdfUrl}
+                        fileName={\`${currentLesson.title}.pdf\`}
+                        onReachLastPage={() => { if (!lessonDone) completeCurrentLesson(); }}
+                      />
                     ) : normalizedCurrentType === 'video' && currentLesson.pdfUrl ? (
-                      <PdfViewer url={currentLesson.pdfUrl} />
+                      <PdfViewer
+                        url={currentLesson.pdfUrl}
+                        fileName={\`${currentLesson.title}.pdf\`}
+                        onReachLastPage={() => { if (!lessonDone) completeCurrentLesson(); }}
+                      />
                     ) : isAssignmentLesson ? (
                       <AssignmentContent courseId={course.id} lesson={currentLesson} onComplete={completeCurrentLesson} />
                     ) : normalizedCurrentType === 'quiz' ? (
@@ -404,15 +414,15 @@ export function CoursePlayerPage() {
                     )}
                   </div>
 
-                  {/* Course Materials — view and download */}
-                  {currentLesson.resources && currentLesson.resources.length > 0 && (
+                  {/* Non-PDF course materials. PDFs are displayed above in the reader. */}
+                  {nonPdfResources.length > 0 && (
                     <div className="mb-6 rounded-xl border border-border bg-card p-4">
                       <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
                         <FileText className="h-4 w-4 text-primary" />
                         Course Materials
                       </h3>
                       <ul className="divide-y divide-border">
-                        {currentLesson.resources.map((r) => (
+                        {nonPdfResources.map((r) => (
                           <li key={r.url} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
                             <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
                               <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
