@@ -26,7 +26,7 @@ function loadPdfJs(): Promise<{ getDocument: (url: string) => { promise: Promise
   return new Promise((resolve, reject) => {
     const script = document.querySelector<HTMLScriptElement>('script[data-akademia-pdfjs]');
     if (script) {
-      script.addEventListener('load', () => resolve((window as Window & { pdfjsLib: { getDocument: (url: string) => { promise: Promise<PdfDocument> }; GlobalWorkerOptions: { workerSrc: string } } }).pdfjsLib), { once: true });
+      script.addEventListener('load', () => resolve((window as unknown as { pdfjsLib: { getDocument: (url: string) => { promise: Promise<PdfDocument> }; GlobalWorkerOptions: { workerSrc: string } } }).pdfjsLib), { once: true });
       script.addEventListener('error', () => reject(new Error('Could not load PDF reader')), { once: true });
       return;
     }
