@@ -183,7 +183,7 @@ export function CourseDetailPage() {
         }
 
         if (slug) {
-          const localCourse = getCourseBySlug(slug);
+          const localCourse = getCourseBySlug(slug ?? '');
           if (localCourse) {
             if (!cancelled) setCourse(localCourse);
             return;
