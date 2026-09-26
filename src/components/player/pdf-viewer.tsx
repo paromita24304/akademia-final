@@ -1,136 +1,149 @@
-import { useState, useRef } from 'react';
-import {
-  FileText,
-  ZoomIn,
-  ZoomOut,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  Maximize,
-} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Download, FileText, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 interface PdfViewerProps {
   url: string;
   fileName?: string;
+  onReachLastPage?: () => void;
 }
 
-export function PdfViewer({ url, fileName = 'Document' }: PdfViewerProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [zoom, setZoom] = useState(100);
+type PdfDocument = {
+  numPages: number;
+  getPage: (page: number) => Promise<{
+    getViewport: (options: { scale: number }) => { width: number; height: number };
+    render: (options: { canvasContext: CanvasRenderingContext2D; viewport: { width: number; height: number } }) => { promise: Promise<void> };
+  }>;
+};
+
+const pdfJsUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const pdfWorkerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+function loadPdfJs(): Promise<{ getDocument: (url: string) => { promise: Promise<PdfDocument> }; GlobalWorkerOptions: { workerSrc: string } }> {
+  const existing = (window as Window & { pdfjsLib?: unknown }).pdfjsLib;
+  if (existing) return Promise.resolve(existing as { getDocument: (url: string) => { promise: Promise<PdfDocument> }; GlobalWorkerOptions: { workerSrc: string } });
+
+  return new Promise((resolve, reject) => {
+    const script = document.querySelector<HTMLScriptElement>('script[data-akademia-pdfjs]');
+    if (script) {
+      script.addEventListener('load', () => resolve((window as Window & { pdfjsLib: { getDocument: (url: string) => { promise: Promise<PdfDocument> }; GlobalWorkerOptions: { workerSrc: string } } }).pdfjsLib), { once: true });
+      script.addEventListener('error', () => reject(new Error('Could not load PDF reader')), { once: true });
+      return;
+    }
+
+    const next = document.createElement('script');
+    next.src = pdfJsUrl;
+    next.async = true;
+    next.dataset.akademiaPdfjs = 'true';
+    next.onload = () => {
+      const library = (window as Window & { pdfjsLib?: { getDocument: (url: string) => { promise: Promise<PdfDocument> }; GlobalWorkerOptions: { workerSrc: string } } }).pdfjsLib;
+      if (library) resolve(library); else reject(new Error('PDF reader did not load'));
+    };
+    next.onerror = () => reject(new Error('Could not load PDF reader'));
+    document.head.appendChild(next);
+  });
+}
+
+export function PdfViewer({ url, fileName = 'Document.pdf', onReachLastPage }: PdfViewerProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const documentRef = useRef<PdfDocument | null>(null);
+  const notifiedLastPage = useRef(false);
   const [page, setPage] = useState(1);
-  const [ totalPages ] = useState(8);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [totalPages, setTotalPages] = useState(0);
+  const [zoom, setZoom] = useState(100);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    documentRef.current = null;
+    notifiedLastPage.current = false;
+    setPage(1);
+    setTotalPages(0);
+    setLoading(true);
+    setError('');
+
+    void loadPdfJs()
+      .then((pdfjs) => {
+        pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+        return pdfjs.getDocument(url).promise;
+      })
+      .then((document) => {
+        if (cancelled) return;
+        documentRef.current = document;
+        setTotalPages(document.numPages);
+      })
+      .catch(() => {
+        if (!cancelled) setError('This PDF could not be displayed. You can download it instead.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [url]);
+
+  useEffect(() => {
+    const document = documentRef.current;
+    const canvas = canvasRef.current;
+    if (!document || !canvas || !totalPages) return;
+
+    let cancelled = false;
+    void document.getPage(page).then((pdfPage) => {
+      if (cancelled || !canvas) return;
+      const viewport = pdfPage.getViewport({ scale: (zoom / 100) * 1.35 });
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      const context = canvas.getContext('2d');
+      if (!context) return;
+      return pdfPage.render({ canvasContext: context, viewport }).promise;
+    }).catch(() => {
+      if (!cancelled) setError('This PDF page could not be displayed.');
+    });
+    return () => { cancelled = true; };
+  }, [page, totalPages, zoom]);
+
+  useEffect(() => {
+    if (totalPages > 0 && page === totalPages && !notifiedLastPage.current) {
+      notifiedLastPage.current = true;
+      onReachLastPage?.();
+    }
+  }, [page, totalPages, onReachLastPage]);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-3 py-2">
-        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="truncate text-sm font-medium text-foreground">{fileName}</span>
-        <div className="ml-auto flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-            aria-label="Previous page"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="px-1 text-xs tabular-nums text-muted-foreground">
-            {page} / {totalPages}
-          </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages}
-            aria-label="Next page"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <div className="mx-1 h-5 w-px bg-border" />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setZoom((z) => Math.max(50, z - 25))}
-            aria-label="Zoom out"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <span className="w-10 text-center text-xs tabular-nums text-muted-foreground">{zoom}%</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setZoom((z) => Math.min(200, z + 25))}
-            aria-label="Zoom in"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <div className="mx-1 h-5 w-px bg-border" />
-          <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-            <a href={url} download={fileName} aria-label="Download">
-              <Download className="h-4 w-4" />
-            </a>
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setSidebarOpen((v) => !v)}
-            aria-label="Toggle outline"
-          >
-            <Maximize className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+    <section className="overflow-hidden rounded-xl border border-border bg-card">
+      <header className="flex items-center gap-2 border-b border-border bg-muted/30 px-3 py-2">
+        <FileText className="h-4 w-4 shrink-0 text-primary" />
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{fileName}</span>
+        <span className="text-xs text-muted-foreground">{totalPages ? `${page} / ${totalPages}` : 'Loading'}</span>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom((value) => Math.max(75, value - 25))} disabled={loading} aria-label="Zoom out">
+          <ZoomOut className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom((value) => Math.min(175, value + 25))} disabled={loading} aria-label="Zoom in">
+          <ZoomIn className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+          <a href={url} download={fileName} aria-label="Download PDF">
+            <Download className="h-4 w-4" />
+          </a>
+        </Button>
+      </header>
 
-      {/* Document area */}
-      <div className="flex flex-1 overflow-hidden">
-        {sidebarOpen && (
-          <div className="w-48 shrink-0 overflow-y-auto border-r border-border bg-muted/20 p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pages</p>
-            <ul className="space-y-1">
-              {Array.from({ length: totalPages }, (_, i) => (
-                <li key={i}>
-                  <button
-                    onClick={() => setPage(i + 1)}
-                    className={cn(
-                      'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors',
-                      page === i + 1
-                        ? 'bg-primary/10 text-primary font-medium'
-                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                    )}
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    Page {i + 1}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+      <div className="min-h-[560px] overflow-auto bg-muted/40 p-4">
+        {loading ? (
+          <div className="grid min-h-[520px] place-items-center text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading document…</div>
+        ) : error ? (
+          <div className="grid min-h-[520px] place-items-center p-6 text-center text-sm text-muted-foreground">{error}</div>
+        ) : (
+          <canvas ref={canvasRef} className="mx-auto max-w-full rounded bg-white shadow-sm" />
         )}
-
-        <div className="relative flex-1 overflow-auto bg-muted/40 p-4 lg:p-8">
-          <div
-            className="mx-auto transition-transform duration-200"
-            style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
-          >
-            <iframe
-              ref={iframeRef}
-              src={`${url}#page=${page}&toolbar=0&navpanes=0&view=FitH`}
-              title={fileName}
-              className="h-[600px] w-full rounded-lg border border-border bg-white shadow-lg"
-            />
-          </div>
-        </div>
       </div>
-    </div>
+
+      <footer className="flex items-center justify-between border-t border-border px-3 py-2">
+        <Button variant="outline" size="sm" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1 || loading}>Previous</Button>
+        <p className="text-xs text-muted-foreground">{page === totalPages && totalPages > 0 ? 'Final page reached' : 'Read to the final page to complete this lesson.'}</p>
+        <Button variant="outline" size="sm" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={page >= totalPages || loading}>Next page</Button>
+      </footer>
+    </section>
   );
 }
