@@ -12,4 +12,14 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  // Deliver uploaded videos, PDFs, and images through Vite during local development.
+  // This keeps the browser on one origin and avoids CORS problems in the PDF reader.
+  server: {
+    proxy: {
+      '/uploads': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+      },
+    },
+  },
 });
