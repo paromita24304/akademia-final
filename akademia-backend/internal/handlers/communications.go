@@ -333,5 +333,61 @@ func CreateInstructorCourseMessage(w http.ResponseWriter, r *http.Request) {
 		writeStudentError(w, 500, "Could not send reply")
 		return
 	}
+	createNotification(input.StudentID, "instructor_reply", "New reply from your instructor", strings.TrimSpace(input.Content), "/student/courses/"+strings.TrimSpace(input.CourseID))
 	json.NewEncoder(w).Encode(map[string]interface{}{"id": id, "student_id": input.StudentID, "course_id": input.CourseID, "sender_role": "instructor", "content": strings.TrimSpace(input.Content), "created_at": created})
+}
+
+
+type platformNotification struct {
+	ID        int       `json:"id"`
+	Kind      string    `json:"kind"`
+	Title     string    `json:"title"`
+	Body      string    `json:"body"`
+	Link      string    `json:"link"`
+	IsRead    bool      `json:"is_read"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func ensureNotificationsTable() error {
+	_, err := config.DB.Exec(`CREATE TABLE IF NOT EXISTS platform_notifications (
+		id BIGSERIAL PRIMARY KEY,
+		user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		kind TEXT NOT NULL,
+		title TEXT NOT NULL,
+		body TEXT NOT NULL DEFAULT '',
+		link TEXT NOT NULL DEFAULT '',
+		is_read BOOLEAN NOT NULL DEFAULT FALSE,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	); CREATE INDEX IF NOT EXISTS platform_notifications_user_created_idx ON platform_notifications(user_id, created_at DESC);`)
+	return err
+}
+
+func createNotification(userID int, kind, title, body, link string) {
+	if userID < 1 || ensureNotificationsTable() != nil { return }
+	_, _ = config.DB.Exec(`INSERT INTO platform_notifications(user_id, kind, title, body, link) VALUES($1,$2,$3,$4,$5)`, userID, kind, title, body, link)
+}
+
+func Notifications(w http.ResponseWriter, r *http.Request) {
+	viewer, err := currentUser(r)
+	if err != nil { writeStudentError(w, http.StatusUnauthorized, err.Error()); return }
+	if err := ensureNotificationsTable(); err != nil { writeStudentError(w, 500, "Could not load notifications"); return }
+	rows, err := config.DB.Query(`SELECT id, kind, title, body, link, is_read, created_at FROM platform_notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 25`, viewer.UserID)
+	if err != nil { writeStudentError(w, 500, "Could not load notifications"); return }
+	defer rows.Close()
+	items := []platformNotification{}
+	for rows.Next() {
+		var item platformNotification
+		if err := rows.Scan(&item.ID, &item.Kind, &item.Title, &item.Body, &item.Link, &item.IsRead, &item.CreatedAt); err != nil { writeStudentError(w, 500, "Could not read notifications"); return }
+		items = append(items, item)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"notifications": items})
+}
+
+func MarkNotificationsRead(w http.ResponseWriter, r *http.Request) {
+	viewer, err := currentUser(r)
+	if err != nil { writeStudentError(w, http.StatusUnauthorized, err.Error()); return }
+	if err := ensureNotificationsTable(); err != nil { writeStudentError(w, 500, "Could not update notifications"); return }
+	_, err = config.DB.Exec(`UPDATE platform_notifications SET is_read=TRUE WHERE user_id=$1 AND is_read=FALSE`, viewer.UserID)
+	if err != nil { writeStudentError(w, 500, "Could not update notifications"); return }
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
