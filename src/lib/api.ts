@@ -10,6 +10,9 @@ export const getImageUrl = (path?: string | null): string => {
     return path;
   }
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  // In Vite development, /uploads is proxied to Go so PDF.js can read course
+  // documents without a cross-origin request.
+  if (import.meta.env.DEV && cleanPath.startsWith('/uploads/')) return cleanPath;
   return `${BACKEND_BASE_URL}${cleanPath}`;
 };
 
