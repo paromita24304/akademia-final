@@ -84,14 +84,8 @@ export function CourseDetailPage() {
         const courseReference = id || slug;
         if (courseReference) {
           const data = await apiRequest(`/courses/${encodeURIComponent(courseReference)}`);
-          // Fetch the student's existing submissions in parallel so assignment
-          // lessons can show their "already submitted" state right away.
-          let submittedLessonIds = new Set<string>();
-          try {
-            const { getMyAssignmentSubmissions } = await import('@/lib/student-api');
-            const subs = await getMyAssignmentSubmissions();
-            submittedLessonIds = new Set(subs.map((s) => s.lesson_id));
-          } catch { /* not logged in or network error — degrade gracefully */ }
+          // Display course data immediately. Assignment submission badges are
+          // supplemental and must never delay this page.
           const mapped = {
             id: data.id,
             slug: data.slug || data.id,
@@ -131,7 +125,7 @@ export function CourseDetailPage() {
                   assignmentTitle: lesson.assignment_title || undefined,
                   assignmentDescription: lesson.assignment_instructions || undefined,
                   assignmentPoints: lesson.assignment_points || undefined,
-                  assignmentSubmitted: submittedLessonIds.has(lesson.id as string),
+                  assignmentSubmitted: false,
                 resources: [
                   ...(lesson.resource_path
                     ? [{ label: lesson.title + ' — Material', url: resolveBackendAssetUrl(lesson.resource_path) }]
@@ -146,6 +140,24 @@ export function CourseDetailPage() {
             progress: 0,
           } as any;
           if (!cancelled) setCourse(mapped);
+          // Hydrate submitted-assignment badges after the page is visible.
+          void import('@/lib/student-api')
+            .then(({ getMyAssignmentSubmissions }) => getMyAssignmentSubmissions())
+            .then((submissions) => {
+              if (cancelled) return;
+              const submittedLessonIds = new Set(submissions.map((item) => item.lesson_id));
+              setCourse((current) => current ? {
+                ...current,
+                modules: current.modules.map((module) => ({
+                  ...module,
+                  lessons: module.lessons.map((lesson) => ({
+                    ...lesson,
+                    assignmentSubmitted: Boolean(lesson.assignmentSubmitted) || submittedLessonIds.has(lesson.id),
+                  })),
+                })),
+              } : current);
+            })
+            .catch(() => undefined);
           return;
         }
 
